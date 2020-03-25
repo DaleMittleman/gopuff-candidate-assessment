@@ -22,7 +22,7 @@ namespace Microservice.CartManager.Repositories
         {
             // Get products collection from file.
             var productSearchResults = JsonSerializer.Deserialize<ProductSearchResults>(
-                File.ReadAllText("../products.json"),
+                File.ReadAllText("products.json"),
                 new JsonSerializerOptions()
                 {
                     PropertyNamingPolicy = SnakeCaseNamingPolicy.Instance,

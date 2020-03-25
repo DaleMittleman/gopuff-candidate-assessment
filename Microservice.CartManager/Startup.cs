@@ -65,7 +65,7 @@ namespace Microservice.CartManager
             // Add Redis configuration
             services.AddStackExchangeRedisCache(options =>
             {
-                options.Configuration = "127.0.0.1";
+                options.Configuration = this.Configuration.GetConnectionString("Redis");
             });
 
             // Add collection repositories
