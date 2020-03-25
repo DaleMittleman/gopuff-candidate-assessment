@@ -13,6 +13,7 @@ namespace Microservice.CartManager.Repositories
     public class ProductRepository : IProductRepository
     {
         private readonly IEnumerable<Product> products;
+        private readonly HashSet<int> validProductIds;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ProductRepository"/> class.
@@ -21,13 +22,14 @@ namespace Microservice.CartManager.Repositories
         {
             // Get products collection from file.
             var productSearchResults = JsonSerializer.Deserialize<ProductSearchResults>(
-                File.ReadAllText("../../products.json"),
+                File.ReadAllText("../products.json"),
                 new JsonSerializerOptions()
                 {
                     PropertyNamingPolicy = SnakeCaseNamingPolicy.Instance,
                 });
 
             this.products = productSearchResults.Products;
+            this.validProductIds = this.products.Select(p => p.ProductId).ToHashSet();
         }
 
         /// <inheritdoc/>
@@ -45,7 +47,7 @@ namespace Microservice.CartManager.Repositories
         /// <inheritdoc/>
         public bool IsValidProductId(int productId)
         {
-            return this.products.Any(product => product.ProductId == productId);
+            return this.validProductIds.Contains(productId);
         }
     }
 }

@@ -1,5 +1,6 @@
 namespace Microservice.CartManager
 {
+    using System.Text.Json.Serialization;
     using Microservice.CartManager.Repositories;
     using Microservice.CartManager.Utilities;
     using Microsoft.AspNetCore.Builder;
@@ -38,6 +39,7 @@ namespace Microservice.CartManager
                 .AddControllers()
                 .AddJsonOptions(options =>
                 {
+                    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
                     options.JsonSerializerOptions.IgnoreNullValues = true;
                     options.JsonSerializerOptions.PropertyNamingPolicy = SnakeCaseNamingPolicy.Instance;
                 });
@@ -49,7 +51,7 @@ namespace Microservice.CartManager
                     "v1",
                     new OpenApiInfo()
                     {
-                        Title = "Cart Managmeent API",
+                        Title = "Cart Management API",
                         Description = "REST API for Cart Management developed for goPuff candidate evaluation",
                         Version = "v1",
                         Contact = new OpenApiContact()
