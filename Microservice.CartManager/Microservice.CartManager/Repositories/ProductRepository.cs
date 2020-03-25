@@ -1,6 +1,7 @@
 namespace Microservice.CartManager.Repositories
 {
     using System.IO;
+    using System.Linq;
     using System.Text.Json;
     using Microservice.CartManager.Models;
     using Microservice.CartManager.Utilities;
@@ -29,14 +30,13 @@ namespace Microservice.CartManager.Repositories
         /// <inheritdoc/>
         public Product GetProduct(int productId)
         {
-            throw new System.NotImplementedException();
+            return this.productSearchResults.Products.FirstOrDefault(product => product.ProductId == productId);
         }
 
         /// <inheritdoc/>
         public bool IsValidProductId(int productId)
         {
-            throw new System.NotImplementedException();
+            return this.productSearchResults.Products.Any(product => product.ProductId == productId);
         }
     }
-
 }
