@@ -5,6 +5,7 @@ namespace Microservice.CartManager
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.Hosting;
+    using Microsoft.OpenApi.Models;
 
     /// <summary>
     /// Contains all custom startup logic and builds the application.
@@ -32,6 +33,28 @@ namespace Microservice.CartManager
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddControllers();
+
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc(
+                    "v1",
+                    new OpenApiInfo()
+                    {
+                        Title = "Cart Managmeent API",
+                        Description = "REST API for Cart Management developed for goPuff candidate evaluation",
+                        Version = "v1",
+                        Contact = new OpenApiContact()
+                        {
+                            Email = "dalemittleman@gmail.com",
+                            Name = "Dale Mittleman",
+                        },
+                    });
+            });
+
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = "127.0.0.1";
+            });
         }
 
         /// <summary>
@@ -47,6 +70,16 @@ namespace Microservice.CartManager
             }
 
             app.UseHttpsRedirection();
+
+            // Enable middleware to serve generated Swagger as a JSON endpoint.
+            app.UseSwagger();
+
+            // Enable middleware to serve swagger-ui (HTML, JS, CSS, etc.),
+            // specifying the Swagger JSON endpoint.
+            app.UseSwaggerUI(c =>
+            {
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Cart API V1");
+            });
 
             app.UseRouting();
 
