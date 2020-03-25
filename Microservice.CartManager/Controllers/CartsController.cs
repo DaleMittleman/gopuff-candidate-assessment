@@ -327,6 +327,9 @@
             cart.Status = CartStatus.CheckedOut;
             cart.Meta.LastModified = DateTime.UtcNow;
 
+            // Push changes to cache.
+            await this.cache.SetAsync(cart.CacheKey, cart);
+
             this.HttpContext.Response.Headers["Location"] = this.Url.ActionLink("GetCart", "Carts", new { cartId });
             return this.Ok(cart);
         }
@@ -362,6 +365,9 @@
             cart.Status = CartStatus.Ordered;
             cart.PaymentMethod = paymentInfo.PaymentMethod;
             cart.Meta.LastModified = DateTime.UtcNow;
+
+            // Push changes to cache.
+            await this.cache.SetAsync(cart.CacheKey, cart);
 
             this.HttpContext.Response.Headers["Location"] = this.Url.ActionLink("GetCart", "Carts", new { cartId });
             return this.Ok(cart);
