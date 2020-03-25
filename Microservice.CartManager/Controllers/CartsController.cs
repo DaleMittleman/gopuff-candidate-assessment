@@ -55,11 +55,9 @@
             {
                 return this.NotFound($"Cart {cartId} not found.");
             }
-            else
-            {
-                this.HttpContext.Response.Headers["Location"] = cart.Meta.Location;
-                return this.Ok(cart);
-            }
+
+            this.HttpContext.Response.Headers["Location"] = cart.Meta.Location;
+            return this.Ok(cart);
         }
 
         /// <summary>
@@ -109,47 +107,50 @@
             {
                 return this.NotFound($"Cart {cartId} not found.");
             }
+
+            if (cart.Status == CartStatus.Ordered)
+            {
+                return this.BadRequest($"Cannot alter already ordered cart {cartId}");
+            }
+
+            var cartModified = false;
+
+            //// Check edits on the editable properties.
+
+            var productIds = cart.ProductIds?.Where(this.productRepository.IsValidProductId) ?? new List<int>();
+            if (productIds.Any())
+            {
+                oldCart.ProductIds = productIds;
+                oldCart.Meta.LastModified = DateTime.Now;
+                oldCart.Status = CartStatus.Active;
+                cartModified = true;
+            }
+
+            if (cart.Recipient != null && !cart.Recipient.Equals(oldCart.Recipient))
+            {
+                oldCart.Recipient = cart.Recipient;
+                oldCart.Meta.LastModified = DateTime.Now;
+                cartModified = true;
+            }
+
+            if (cart.DeliveryAddress != null && !cart.DeliveryAddress.Equals(oldCart.DeliveryAddress))
+            {
+                oldCart.DeliveryAddress = cart.DeliveryAddress;
+                oldCart.Meta.LastModified = DateTime.Now;
+                cartModified = true;
+            }
+
+            if (cartModified)
+            {
+                // Push changes to cache
+                await this.cache.SetAsync(oldCart.CacheKey, oldCart);
+
+                this.HttpContext.Response.Headers["Location"] = this.Url.ActionLink("GetCart", "Carts", new { cartId });
+                return this.Ok(oldCart);
+            }
             else
             {
-                var cartModified = false;
-
-                //// Check edits on the editable properties.
-
-                var productIds = cart.ProductIds?.Where(this.productRepository.IsValidProductId) ?? new List<int>();
-                if (productIds.Any())
-                {
-                    oldCart.ProductIds = productIds;
-                    oldCart.Meta.LastModified = DateTime.Now;
-                    oldCart.Status = CartStatus.Active;
-                    cartModified = true;
-                }
-
-                if (cart.Recipient != null && !cart.Recipient.Equals(oldCart.Recipient))
-                {
-                    oldCart.Recipient = cart.Recipient;
-                    oldCart.Meta.LastModified = DateTime.Now;
-                    cartModified = true;
-                }
-
-                if (cart.DeliveryAddress != null && !cart.DeliveryAddress.Equals(oldCart.DeliveryAddress))
-                {
-                    oldCart.DeliveryAddress = cart.DeliveryAddress;
-                    oldCart.Meta.LastModified = DateTime.Now;
-                    cartModified = true;
-                }
-
-                if (cartModified)
-                {
-                    // Push changes to cache
-                    await this.cache.SetAsync(oldCart.CacheKey, oldCart);
-
-                    this.HttpContext.Response.Headers["Location"] = this.Url.ActionLink("GetCart", "Carts", new { cartId });
-                    return this.Ok(oldCart);
-                }
-                else
-                {
-                    return this.StatusCode(304, "No changes made");
-                }
+                return this.StatusCode(304, "No changes made");
             }
         }
 
@@ -169,11 +170,14 @@
             {
                 return this.NotFound($"Cart {cartId} not found.");
             }
-            else
+
+            if (cart.Status == CartStatus.Ordered)
             {
-                await this.cache.RemoveAsync(cart.CacheKey);
-                return this.NoContent();
+                return this.BadRequest($"Cannot delete already ordered cart {cartId}");
             }
+
+            await this.cache.RemoveAsync(cart.CacheKey);
+            return this.NoContent();
         }
 
         /// <summary>
@@ -193,25 +197,28 @@
             {
                 return this.NotFound($"Cart {cartId} not found.");
             }
+
+            if (cart.Status == CartStatus.Ordered)
+            {
+                return this.BadRequest($"Cannot alter already ordered cart {cartId}");
+            }
+
+            var validProductIds = productIds?.Where(this.productRepository.IsValidProductId) ?? new List<int>();
+
+            if (validProductIds.Any())
+            {
+                var cartProductIds = cart.ProductIds.ToList();
+                cartProductIds.AddRange(validProductIds);
+
+                cart.ProductIds = cartProductIds;
+
+                cart.Status = CartStatus.Active;
+                cart.Meta.LastModified = DateTime.UtcNow;
+                return this.Ok(cart);
+            }
             else
             {
-                var validProductIds = productIds?.Where(this.productRepository.IsValidProductId) ?? new List<int>();
-
-                if (validProductIds.Any())
-                {
-                    var cartProductIds = cart.ProductIds.ToList();
-                    cartProductIds.AddRange(validProductIds);
-
-                    cart.ProductIds = cartProductIds;
-
-                    cart.Status = CartStatus.Active;
-                    cart.Meta.LastModified = DateTime.UtcNow;
-                    return this.Ok(cart);
-                }
-                else
-                {
-                    return this.StatusCode(304, "No valid product ids present in request body.");
-                }
+                return this.StatusCode(304, "No valid product ids present in request body.");
             }
         }
 
@@ -232,26 +239,132 @@
             {
                 return this.NotFound($"Cart {cartId} not found.");
             }
+
+            if (cart.Status == CartStatus.Ordered)
+            {
+                return this.BadRequest($"Cannot alter already ordered cart {cartId}");
+            }
+
+            if (cart.ProductIds != null && cart.ProductIds.Any(p => p == productId))
+            {
+                var cartProductIds = cart.ProductIds.ToList();
+
+                // Remove first product id
+                cartProductIds.Remove(productId);
+
+                cart.ProductIds = cartProductIds;
+
+                cart.Status = CartStatus.Active;
+                cart.Meta.LastModified = DateTime.UtcNow;
+                return this.Ok(cart);
+            }
             else
             {
-                if (cart.ProductIds != null && cart.ProductIds.Any(p => p == productId))
+                return this.NotFound($"Cart {cartId} does not contain a product with id {productId}");
+            }
+        }
+
+        /// <summary>
+        /// Move a cart to check out.  Add validation for carts.
+        /// </summary>
+        /// <param name="cartId">The cart id.</param>
+        /// <returns>A <see cref="IActionResult"/>.</returns>
+        [HttpPost("{cartId}/CheckOut")]
+        public async Task<IActionResult> CheckOutCart([FromRoute] Guid cartId)
+        {
+            this.logger.Log(LogLevel.Information, $"Called: POST /Carts/{cartId}/CheckOut");
+
+            var cart = await this.cache.GetAsync<Cart>(Cart.GenerateCacheKey(cartId));
+
+            if (cart == null)
+            {
+                return this.NotFound($"Cart {cartId} not found.");
+            }
+
+            if (cart.Status == CartStatus.Ordered)
+            {
+                return this.BadRequest($"Cannot checkout already ordered cart {cartId}");
+            }
+
+            //// Validation
+
+            if (string.IsNullOrWhiteSpace(cart.Recipient))
+            {
+                return this.BadRequest("Cart must have a non-empty recipient name.");
+            }
+
+            if (string.IsNullOrWhiteSpace(cart.DeliveryAddress))
+            {
+                return this.BadRequest("Cart must have a non-empty delivery address.");
+            }
+
+            if (cart.ProductIds.Count() < 5)
+            {
+                return this.BadRequest("Cart must contain at least 5 products.");
+            }
+
+            var itemsPulledFromStock = new List<int>();
+            foreach (var productId in cart.ProductIds)
+            {
+                if (!this.productRepository.IsValidProductId(productId))
                 {
-                    var cartProductIds = cart.ProductIds.ToList();
+                    return this.BadRequest($"Product id {productId} is invalid.");
+                }
 
-                    // Remove first product id
-                    cartProductIds.Remove(productId);
+                if (!this.productRepository.TryDepleteStock(productId))
+                {
+                    // Return pulled items
+                    itemsPulledFromStock.ForEach(this.productRepository.IncreaseStock);
 
-                    cart.ProductIds = cartProductIds;
-
-                    cart.Status = CartStatus.Active;
-                    cart.Meta.LastModified = DateTime.UtcNow;
-                    return this.Ok(cart);
+                    return this.BadRequest($"Not enough of product {productId} in stock");
                 }
                 else
                 {
-                    return this.NotFound($"Cart {cartId} does not contain a product with id {productId}");
+                    itemsPulledFromStock.Add(productId);
                 }
             }
+
+            cart.Status = CartStatus.CheckedOut;
+            cart.Meta.LastModified = DateTime.UtcNow;
+
+            this.HttpContext.Response.Headers["Location"] = this.Url.ActionLink("GetCart", "Carts", new { cartId });
+            return this.Ok(cart);
+        }
+
+        /// <summary>
+        /// Move a cart to check out.  Add validation for carts.
+        /// </summary>
+        /// <param name="cartId">The cart id.</param>
+        /// <param name="paymentInfo">The payment information.</param>
+        /// <returns>A <see cref="IActionResult"/>.</returns>
+        [HttpPost("{cartId}/Order")]
+        public async Task<IActionResult> OrderCart([FromRoute] Guid cartId, [FromBody] PaymentInformation paymentInfo)
+        {
+            this.logger.Log(LogLevel.Information, $"Called: POST /Carts/{cartId}/CheckOut");
+
+            var cart = await this.cache.GetAsync<Cart>(Cart.GenerateCacheKey(cartId));
+
+            if (cart == null)
+            {
+                return this.NotFound($"Cart {cartId} not found.");
+            }
+
+            if (cart.Status != CartStatus.CheckedOut)
+            {
+                return this.BadRequest($"Cannot order a cart if it is not in a checked out state.");
+            }
+
+            if (paymentInfo.PaymentMethod == null || string.IsNullOrWhiteSpace(paymentInfo.BillingAddress))
+            {
+                return this.BadRequest($"Invalid or incomplete payment information.");
+            }
+
+            cart.Status = CartStatus.Ordered;
+            cart.PaymentMethod = paymentInfo.PaymentMethod;
+            cart.Meta.LastModified = DateTime.UtcNow;
+
+            this.HttpContext.Response.Headers["Location"] = this.Url.ActionLink("GetCart", "Carts", new { cartId });
+            return this.Ok(cart);
         }
     }
 }

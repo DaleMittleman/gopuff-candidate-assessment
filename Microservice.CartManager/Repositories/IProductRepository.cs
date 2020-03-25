@@ -1,6 +1,7 @@
 ﻿namespace Microservice.CartManager.Repositories
 {
     using System.Collections.Generic;
+    using System.Runtime.InteropServices.ComTypes;
     using Microservice.CartManager.Models;
 
     /// <summary>
@@ -28,5 +29,18 @@
         /// <param name="productId">The product id.</param>
         /// <returns>A value indicating whether a product exists with that id.</returns>
         bool IsValidProductId(int productId);
+
+        /// <summary>
+        /// Deplete the stock of a product.
+        /// </summary>
+        /// <param name="productId">The product id to deplete.</param>
+        /// <returns>A value indicating the stock could be depleted.</returns>
+        bool TryDepleteStock(int productId);
+
+        /// <summary>
+        /// Increase the stock of a product.
+        /// </summary>
+        /// <param name="productId">The product id to add.</param>
+        void IncreaseStock(int productId);
     }
 }
