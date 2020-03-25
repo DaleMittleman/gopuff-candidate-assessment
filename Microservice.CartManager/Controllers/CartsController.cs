@@ -47,7 +47,7 @@
         [HttpGet("{cartId}")]
         public async Task<IActionResult> GetCart(Guid cartId)
         {
-            this.logger.Log(LogLevel.Information, "Called: GET /Carts");
+            this.logger.Log(LogLevel.Information, $"Called: GET /Carts/{cartId}");
 
             var cart = await this.cache.GetAsync<Cart>(Cart.GenerateCacheKey(cartId));
 
@@ -93,6 +93,67 @@
         }
 
         /// <summary>
+        /// Update a cart.
+        /// </summary>
+        /// <param name="cartId">The cart id.</param>
+        /// <param name="cart">The cart.</param>
+        /// <returns>A <see cref="IActionResult"/>.</returns>
+        [HttpPut("{cartId}")]
+        public async Task<IActionResult> UpdateCart([FromRoute] Guid cartId, [FromBody] Cart cart)
+        {
+            this.logger.Log(LogLevel.Information, $"Called: PUT /Carts/{cartId}");
+
+            var oldCart = await this.cache.GetAsync<Cart>(Cart.GenerateCacheKey(cartId));
+
+            if (oldCart == null)
+            {
+                return this.NotFound($"Cart {cartId} not found.");
+            }
+            else
+            {
+                var cartModified = false;
+
+                //// Check edits on the editable properties.
+
+                var productIds = cart.ProductIds?.Where(this.productRepository.IsValidProductId) ?? new List<int>();
+                if (productIds.Any())
+                {
+                    oldCart.ProductIds = productIds;
+                    oldCart.Meta.LastModified = DateTime.Now;
+                    oldCart.Status = CartStatus.Active;
+                    cartModified = true;
+                }
+
+                if (cart.Recipient != null && !cart.Recipient.Equals(oldCart.Recipient))
+                {
+                    oldCart.Recipient = cart.Recipient;
+                    oldCart.Meta.LastModified = DateTime.Now;
+                    cartModified = true;
+                }
+
+                if (cart.DeliveryAddress != null && !cart.DeliveryAddress.Equals(oldCart.DeliveryAddress))
+                {
+                    oldCart.DeliveryAddress = cart.DeliveryAddress;
+                    oldCart.Meta.LastModified = DateTime.Now;
+                    cartModified = true;
+                }
+
+                if (cartModified)
+                {
+                    // Push changes to cache
+                    await this.cache.SetAsync(oldCart.CacheKey, oldCart);
+
+                    this.HttpContext.Response.Headers["Location"] = this.Url.ActionLink("GetCart", "Carts", new { cartId });
+                    return this.Ok(oldCart);
+                }
+                else
+                {
+                    return this.StatusCode(304, "No changes made");
+                }
+            }
+        }
+
+        /// <summary>
         /// Delete a cart.
         /// </summary>
         /// <param name="cartId">The cart id.</param>
@@ -134,7 +195,7 @@
             }
             else
             {
-                var validProductIds = productIds.Where(this.productRepository.IsValidProductId);
+                var validProductIds = productIds?.Where(this.productRepository.IsValidProductId) ?? new List<int>();
 
                 if (validProductIds.Any())
                 {
