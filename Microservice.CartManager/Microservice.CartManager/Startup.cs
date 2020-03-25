@@ -1,5 +1,6 @@
 namespace Microservice.CartManager
 {
+    using Microservice.CartManager.Repositories;
     using Microservice.CartManager.Utilities;
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Hosting;
@@ -40,6 +41,7 @@ namespace Microservice.CartManager
                     options.JsonSerializerOptions.PropertyNamingPolicy = SnakeCaseNamingPolicy.Instance;
                 });
 
+            // Add swagger documentation configuration
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc(
@@ -57,10 +59,14 @@ namespace Microservice.CartManager
                     });
             });
 
+            // Add Redis configuration
             services.AddStackExchangeRedisCache(options =>
             {
                 options.Configuration = "127.0.0.1";
             });
+
+            // Add collection repositories
+            services.AddSingleton<IProductRepository, ProductRepository>();
         }
 
         /// <summary>
