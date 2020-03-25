@@ -1,5 +1,6 @@
 namespace Microservice.CartManager
 {
+    using Microservice.CartManager.Utilities;
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.Extensions.Configuration;
@@ -32,7 +33,12 @@ namespace Microservice.CartManager
         /// <param name="services">The service collection.</param>
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllers();
+            services
+                .AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNamingPolicy = SnakeCaseNamingPolicy.Instance;
+                });
 
             services.AddSwaggerGen(c =>
             {
