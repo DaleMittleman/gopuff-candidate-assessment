@@ -5,7 +5,7 @@
     /// <summary>
     /// Model for a goPuff product.
     /// </summary>
-    public class Product
+    public class Product : ApiResource
     {
         /// <summary>
         /// Gets or sets the product id.

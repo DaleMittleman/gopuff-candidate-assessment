@@ -1,5 +1,6 @@
 namespace Microservice.CartManager.Repositories
 {
+    using System.Collections.Generic;
     using System.IO;
     using System.Linq;
     using System.Text.Json;
@@ -11,7 +12,7 @@ namespace Microservice.CartManager.Repositories
     /// </summary>
     public class ProductRepository : IProductRepository
     {
-        private readonly ProductSearchResults productSearchResults;
+        private readonly IEnumerable<Product> products;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ProductRepository"/> class.
@@ -19,24 +20,32 @@ namespace Microservice.CartManager.Repositories
         public ProductRepository()
         {
             // Get products collection from file.
-            this.productSearchResults = JsonSerializer.Deserialize<ProductSearchResults>(
+            var productSearchResults = JsonSerializer.Deserialize<ProductSearchResults>(
                 File.ReadAllText("../../products.json"),
                 new JsonSerializerOptions()
                 {
                     PropertyNamingPolicy = SnakeCaseNamingPolicy.Instance,
                 });
+
+            this.products = productSearchResults.Products;
+        }
+
+        /// <inheritdoc/>
+        public (IEnumerable<Product>, int) GetAllProducts(int resultSizeCap = 30)
+        {
+            return (this.products.Take(resultSizeCap), this.products.Count());
         }
 
         /// <inheritdoc/>
         public Product GetProduct(int productId)
         {
-            return this.productSearchResults.Products.FirstOrDefault(product => product.ProductId == productId);
+            return this.products.FirstOrDefault(product => product.ProductId == productId);
         }
 
         /// <inheritdoc/>
         public bool IsValidProductId(int productId)
         {
-            return this.productSearchResults.Products.Any(product => product.ProductId == productId);
+            return this.products.Any(product => product.ProductId == productId);
         }
     }
 }
