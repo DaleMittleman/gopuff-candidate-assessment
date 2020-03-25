@@ -49,5 +49,30 @@ namespace Microservice.CartManager.Repositories
         {
             return this.validProductIds.Contains(productId);
         }
+
+        /// <inheritdoc/>
+        public bool TryDepleteStock(int productId)
+        {
+            var product = this.products.FirstOrDefault(p => p.ProductId == productId);
+            if (product == null)
+            {
+                return false;
+            }
+
+            product.Quantity -= 1;
+            return true;
+        }
+
+        /// <inheritdoc/>
+        public void IncreaseStock(int productId)
+        {
+            var product = this.products.FirstOrDefault(p => p.ProductId == productId);
+            if (product == null)
+            {
+                return;
+            }
+
+            product.Quantity += 1;
+        }
     }
 }
