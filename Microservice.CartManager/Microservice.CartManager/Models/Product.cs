@@ -1,6 +1,7 @@
 ﻿namespace Microservice.CartManager.Models
 {
     using System.Collections.Generic;
+    using System.Text.Json.Serialization;
 
     /// <summary>
     /// Model for a goPuff product.
@@ -150,6 +151,7 @@
         /// <summary>
         /// Gets or sets the badge details.
         /// </summary>
+        [JsonPropertyName("badgeDetails")]
         public IEnumerable<string> BadgeDetails { get; set; }
 
         /// <summary>
