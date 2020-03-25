@@ -40,28 +40,26 @@
         }
 
         /// <summary>
-        /// Get all carts.
-        /// </summary>
-        /// <returns>A <see cref="IActionResult"/>.</returns>
-        [HttpGet]
-        public IActionResult GetAllCarts()
-        {
-            this.logger.Log(LogLevel.Information, "Called: GET /Carts");
-
-            return this.Ok();
-        }
-
-        /// <summary>
         /// Get a cart by id.
         /// </summary>
         /// <param name="cartId">The cart to get.</param>
         /// <returns>A <see cref="IActionResult"/>.</returns>
         [HttpGet("{cartId}")]
-        public IActionResult GetCart(Guid cartId)
+        public async Task<IActionResult> GetCart(Guid cartId)
         {
             this.logger.Log(LogLevel.Information, "Called: GET /Carts");
 
-            return this.Ok();
+            var cart = await this.cache.GetAsync<Cart>(Cart.GenerateCacheKey(cartId));
+
+            if (cart == null)
+            {
+                return this.NotFound($"Cart {cartId} not found.");
+            }
+            else
+            {
+                this.HttpContext.Response.Headers["Location"] = cart.Meta.Location;
+                return this.Ok(cart);
+            }
         }
 
         /// <summary>
